@@ -1,0 +1,4 @@
+SET Aa 1
+SET BB 2
+SET hello world
+SET abc HELLO_WORLD

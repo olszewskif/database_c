@@ -2,6 +2,7 @@
 #include <string.h>
 #include "../include/parser.h"
 #include "../include/tokenizer.h"
+#include "../include/util.h"
 
 void prompt();
 
@@ -15,8 +16,7 @@ int main() {
 
   while(fgets(buffer, buffer_size, stdin) != NULL) {
 
-    size_t idx = strcspn(buffer, "\n");
-    buffer[idx] = '\0';
+    trim_newline(buffer);
 
     if(strcmp(buffer, "QUIT") == 0) {
       return 0;

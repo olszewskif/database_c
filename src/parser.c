@@ -1,114 +1,87 @@
 #include <string.h>
 #include <stdio.h>
 #include "../include/parser.h"
+#include "../include/tokenizer.h"
+#include "../include/hash_map.h"
+#include "../include/util.h"
 
-struct Row data[MAX_ROWS];
-int data_capacity = 0;
+struct hash_map* map = NULL;
 
-static bool get_key(const struct statement* st, int* key) {
-  if(st->token_count < 2) {
+static bool get_key(const struct statement* st, const char** key) {
+  if(st->token_count < 2 || key == NULL) {
     return false;
   }
 
-  sscanf(st->tokens[1].value, "%d", key);
+  *key = st->tokens[1].value;
   return true;
 }
 
-static bool get_index_for_key(int key, int* index) {
-  for(size_t i = 0; i < data_capacity; ++i) {
-    if(data[i].key == key) {
-      *index = i;
-      return true;
-    }
-  }
-  return false;
-}
-
 static void handle_get_command(const struct statement* st) {
-  int key;
+  const char* key;
   if(!get_key(st, &key)) {
     printf("[ERR] Invalid or missing key!\n");
     return;
   }
 
-  int index;
-  if(!get_index_for_key(key, &index)) {
-    printf("[ERR] Row for key %d does not exist!\n", key);
-    return;
+  const char* value = hash_map_get(map, key);
+  if(value) {
+    printf("%s\n", value);
   }
-
-  printf("%s\n", data[index].value);
+  else {
+    printf("[ERR] Entry for key '%s' does not exist!\n", key);
+  }
 }
 
 static void handle_set_command(const struct statement* st) {
-  if(data_capacity >= MAX_ROWS) {
-    printf("[ERR] Data buffer is full. Cannot set any additional row!\n");
-    return;
-  }
-
   if(st->token_count < 3) {
     printf("[ERR] The 'SET' commands needs 3 arguments!\n");
     return;
   }
 
-  int key;
+  const char* key;
   if(!get_key(st, &key)) {
     printf("[ERR] Invalid or missing key!\n");
     return;
   }
-  
-  const char* value = st->tokens[2].value;
-  int index;
-  // Row does not exist
-  if(!get_index_for_key(key, &index)) {
-    struct Row row = { 0 };
-    row.key = key;
-    strncpy(row.value, value, 256);
-    data[data_capacity++] = row;
-  }
-  // Row exists (overwrite)
-  else {
-    strncpy(data[index].value, value, 256);
-  }
 
-  printf("Successfully set '%d' to '%s'.\n", key, value);
+  const char* value = st->tokens[2].value;
+  hash_map_put(map, key, value); 
+
+  printf("Successfully set '%s' to '%s'.\n", key, value);
 }
 
 static void handle_delete_command(const struct statement* st) {
-  int key;
+  const char* key;
   if(!get_key(st, &key)) {
     printf("[ERR] Invalid or missing key!\n");
     return;
   }
 
-  int index;
-  if(!get_index_for_key(key, &index)) {
-    printf("[ERR] Row for key %d does not exist!\n", key);
-    return;
+  if(hash_map_delete(map, key)) {
+    printf("Deleted row for key '%s'.\n", key);
   }
-
-  for(size_t i = index; i < data_capacity - 1; ++i) {
-    data[i] = data[i + 1];
+  else {
+    printf("[ERR] Could not delete entry for key '%s'\n", key);
   }
-  data_capacity--;
-  printf("Deleted row for key '%d'.\n", key);
 }
 
-static void handle_save_command(const struct statement* st) {
-  FILE* file = fopen("data.bin", "wb");
+static void append_data_callback(
+  const char* key, 
+  const char* value,
+  void* context
+) {
+  FILE* file = (FILE*) context;
+  fprintf(file, "SET %s %s\n", key, value);
+}
+
+static void handle_save_command() {
+  FILE* file = fopen("data.txt", "w");
   if(!file) {
     printf("[ERR] Failed to save the data!\n");
     return;
   }
 
-  size_t size = fwrite(data, sizeof(struct Row), data_capacity, file);
-  if(size == data_capacity) {
-    printf("Successfully saved the data.\n");
-  }
-  else {
-    printf("[ERR] Error writing to file!\n");
-  }
-
+  hash_map_iterate(map, append_data_callback, file);
   fclose(file);
 }
 
@@ -135,7 +108,7 @@ void parse(const struct statement* st) {
     handle_delete_command(st);
   }
   else if(strcmp(operation, "SAVE") == 0) {
-    handle_save_command(st);
+    handle_save_command();
   }
   else {
     printf("[ERR] Operation '%s' does not exist!\n", operation);
@@ -143,11 +116,24 @@ void parse(const struct statement* st) {
 }
 
 void load_data() {
-  FILE* file = fopen("data.bin", "rb");
+  map = hash_map_init(16);
+  if(!map) {
+    printf("[ERR] Could not load the data. Failed to initialize the hash map\n");
+    return;
+  }
+
+  FILE* file = fopen("data.txt", "r");
   if(!file) {
     return;
   }
 
-  data_capacity = fread(data, sizeof(struct Row), MAX_ROWS, file);
+  char buffer[256];
+
+  while(fgets(buffer, 256, file)) {
+    trim_newline(buffer);
+    struct statement st = tokenize(buffer);
+    parse(&st);
+  }
+
   fclose(file);
 }

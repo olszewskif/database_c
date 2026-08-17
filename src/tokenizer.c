@@ -32,7 +32,3 @@ void print_statement(const struct statement* st) {
   }
   printf("\n");
 }
-
-static void handle_string(char* token) {
-
-}

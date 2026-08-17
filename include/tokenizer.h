@@ -3,8 +3,10 @@
 
 #include <stddef.h>
 
+#define MAX_TOKEN_LENGTH 256
+
 struct token {
-  char value[256];
+  char value[MAX_TOKEN_LENGTH];
   size_t length;
 };
 
