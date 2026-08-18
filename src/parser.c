@@ -116,7 +116,7 @@ void parse(const struct statement* st) {
 }
 
 void load_data() {
-  map = hash_map_init(16);
+  map = hash_map_init(16, 0.75);
   if(!map) {
     printf("[ERR] Could not load the data. Failed to initialize the hash map\n");
     return;

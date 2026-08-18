@@ -5,35 +5,49 @@
 
 static struct node* create_node(const char* key, const char* value) {
   struct node* new_node = (struct node*) malloc(sizeof(struct node));
+  if(new_node == NULL) {
+    return NULL;
+  }
+
   strncpy(new_node->key, key, MAX_KEY_LENGTH);
   strncpy(new_node->value, value, MAX_VALUE_LENGTH);
   new_node->next = NULL;
   return new_node;
 }
 
-static void push_node(struct node** head, const char* key, 
+/*
+  Pushes node into linked list with specified head.
+  If the key exists and the operation is replacement, return 0 (0 new nodes)
+  If new node has been created and inserted, return 1 (1 new node)
+  If an error occurs, return -1
+*/
+static int push_node(struct node** head, const char* key, 
                       const char* value) {
-  if(!(*head)) {
-    (*head) = create_node(key, value);
-    return;
+  if(*head == NULL) {
+    *head = create_node(key, value);
+    if(*head == NULL) {
+      return -1;
+    }
+
+    return 1;
   }
 
   struct node* temp = *head;
-  while(temp->next != NULL) {
+  for(;;) {
+    if(temp->next == NULL) {
+      temp->next = create_node(key, value);
+      return 1;
+    }
+
     if(strcmp(temp->key, key) == 0) {
       strncpy(temp->value, value, MAX_VALUE_LENGTH);
-      return;
+      return 0;
     }
 
     temp = temp->next;
   }
 
-  if(strcmp(temp->key, key) == 0) {
-      strncpy(temp->value, value, MAX_VALUE_LENGTH);
-      return;
-  }
-
-  temp->next = create_node(key, value);
+  return 0;
 }
 
 static struct node* get_node(struct node* head, const char* key) {
@@ -83,7 +97,6 @@ static void free_nodes(struct node* head) {
 }
 
 static void print_linked_list(struct node* head) {
-  printf("Printing linked list with head key: %s\n", head->key);
   while(head != NULL) {
     printf("Key: %s, Value: %s\n", head->key, head->value);
     head = head->next;
@@ -99,14 +112,55 @@ static int get_hash(const char* key) {
   return hash;
 }
 
-struct hash_map* hash_map_init(size_t size) {
-  struct hash_map* map = (struct hash_map*) malloc(sizeof(struct hash_map));
-  map->bucket_array = (struct node**) malloc(size * sizeof(struct node*));
-  for(size_t i = 0; i < size; ++i) {
-    map->bucket_array[i] = NULL;
+static void reallocate(struct hash_map* map) {
+  size_t new_capacity = map->capacity * 2;
+  struct node** new_bucket_array = (struct node**) calloc(new_capacity, sizeof(struct node*));
+
+  if(new_bucket_array == NULL) {
+    return;
   }
+
+  for(size_t i = 0; i < map->capacity; ++i) {
+    struct node* head = map->bucket_array[i];
+
+    while(head != NULL) {
+      struct node* next = head->next;
+      int new_hash = get_hash(head->key) % new_capacity;
+      struct node** new_head = &new_bucket_array[new_hash];
+
+      if(*new_head == NULL) {
+        *new_head = head;
+        (*new_head)->next = NULL;
+      }
+      else {
+        struct node* temp = *new_head;
+        *new_head = head;
+        (*new_head)->next = temp;
+      }
+
+      head = next;
+    }
+  }
+
+  free(map->bucket_array);
+  map->bucket_array = new_bucket_array;
+  map->capacity = new_capacity;
+}
+
+struct hash_map* hash_map_init(size_t size, float load_factor) {
+  struct hash_map* map = (struct hash_map*) malloc(sizeof(struct hash_map));
+  if(map == NULL) {
+    return NULL;
+  }
+
+  map->bucket_array = (struct node**) calloc(size, sizeof(struct node*));
+  if(map->bucket_array == NULL) {
+    return NULL;
+  }
+
   map->capacity = size;
   map->current_size = 0;
+  map->load_factor = load_factor;
   return map;
 }
 
@@ -120,37 +174,51 @@ void hash_map_free(struct hash_map* map) {
 
 void hash_map_put(struct hash_map* map, const char* key, 
                   const char* value) {
+  float load_factor = (float) map->current_size / map->capacity;
+
+  if(load_factor >= map->load_factor) {
+    reallocate(map);
+  }
+
   int hash = get_hash(key) % map->capacity;
   struct node* head = map->bucket_array[hash];
-  push_node(&head, key, value);
+
+  int res = push_node(&head, key, value);
+  if(res >= 0) {
+    map->current_size += res;
+  }
+  else {
+    printf("[ERR] Out of memory\n");
+  }
 
   if(map->bucket_array[hash] == NULL) {
     map->bucket_array[hash] = head;
   }
+
   print_linked_list(head);
 }
 
 const char* hash_map_get(const struct hash_map* map, const char* key) {
   int hash = get_hash(key) % map->capacity;
   struct node* head = map->bucket_array[hash];
+
   struct node* found = get_node(head, key);
   if(!found) {
-    printf("[ERR] Failed to find node with key %s!\n", key);
     return NULL;
   }
+
   return found->value;
 }
 
 bool hash_map_delete(struct hash_map* map, const char* key) {
   int hash = get_hash(key) % map->capacity;
   struct node** head = &map->bucket_array[hash];
+
   bool res = delete_node(head, key);
   if(res) {
-    printf("Successfully deleted entry with key '%s'\n", key);
+    map->current_size--;
   }
-  else {
-    printf("Could not find an entry with key '%s'\n", key);
-  }
+
   return res;
 }
 

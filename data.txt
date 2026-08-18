@@ -1,4 +1,13 @@
-SET Aa 1
+SET e a
+SET f a
+SET g a
+SET h 1
 SET BB 2
+SET Aa 1
+SET p 3
 SET hello world
+SET lila <3
+SET a e
 SET abc HELLO_WORLD
+SET c a
+SET d a
