@@ -34,14 +34,14 @@ static int push_node(struct node** head, const char* key,
 
   struct node* temp = *head;
   for(;;) {
-    if(temp->next == NULL) {
-      temp->next = create_node(key, value);
-      return 1;
-    }
-
     if(strcmp(temp->key, key) == 0) {
       strncpy(temp->value, value, MAX_VALUE_LENGTH);
       return 0;
+    }
+
+    if(temp->next == NULL) {
+      temp->next = create_node(key, value);
+      return 1;
     }
 
     temp = temp->next;

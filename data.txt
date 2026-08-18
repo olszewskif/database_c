@@ -4,9 +4,10 @@ SET g a
 SET h 1
 SET BB 2
 SET Aa 1
-SET p 3
+SET p 1
 SET hello world
-SET lila <3
+SET lila <333333333333333
+SET LILA <##<#<3
 SET a e
 SET abc HELLO_WORLD
 SET c a

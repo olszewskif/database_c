@@ -15,15 +15,8 @@ int main() {
   prompt();
 
   while(fgets(buffer, buffer_size, stdin) != NULL) {
-
     trim_newline(buffer);
-
-    if(strcmp(buffer, "QUIT") == 0) {
-      return 0;
-    }
-
     struct statement st = tokenize(buffer);
-//    print_statement(&st);
     parse(&st);
     prompt();
   }
