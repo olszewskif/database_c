@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "../include/ui_log.h"
 #include "../include/parser.h"
 #include "../include/tokenizer.h"
 #include "../include/hash_map.h"
@@ -23,28 +24,29 @@ static bool get_key(const struct statement* st, const char** key) {
 static void handle_get_command(const struct statement* st) {
   const char* key;
   if(!get_key(st, &key)) {
-    printf("[ERR] Invalid or missing key!\n");
+    UI_ERROR("Invalid or missing key!");
     return;
   }
 
   const char* value = hash_map_get(map, key);
   if(value) {
     printf("%s\n", value);
+    fflush(stdout);
   }
   else {
-    printf("[ERR] Entry for key '%s' does not exist!\n", key);
+    UI_ERROR("Entry for key '%s' does not exist", key);
   }
 }
 
 static void handle_set_command(const struct statement* st) {
   if(st->token_count < 3) {
-    printf("[ERR] The 'SET' commands needs 3 arguments!\n");
+    UI_ERROR("'SET' command needs 3 arguments!");
     return;
   }
 
   const char* key;
   if(!get_key(st, &key)) {
-    printf("[ERR] Invalid or missing key!\n");
+    UI_ERROR("Invalid or missing key!");
     return;
   }
 
@@ -54,28 +56,28 @@ static void handle_set_command(const struct statement* st) {
   if(!is_loading) {
     fprintf(file, "SET %s %s\n", key, value);
     fflush(file);
+    UI_SUCCESS("Successfully set '%s' to '%s'.", key, value);
   }
-
-  printf("Successfully set '%s' to '%s'.\n", key, value);
 }
 
 static void handle_delete_command(const struct statement* st) {
   const char* key;
   if(!get_key(st, &key)) {
-    printf("[ERR] Invalid or missing key!\n");
+    UI_ERROR("Invalid or missing key!");
     return;
   }
 
   if(hash_map_delete(map, key)) {
-    printf("Deleted row for key '%s'.\n", key);
+    if(!is_loading) {
+      UI_SUCCESS("Deleted entry for key '%s'", key);
+      fprintf(file, "DELETE %s\n", key);
+      fflush(file);
+    }
   }
   else {
-    printf("[ERR] Could not delete entry for key '%s'\n", key);
-  }
-
-  if(!is_loading) {
-    fprintf(file, "DELETE %s\n", key);
-    fflush(file);
+    if(!is_loading) {
+      UI_ERROR("Could not delete entry for key '%s'", key);
+    }
   }
 }
 
@@ -90,7 +92,7 @@ static void append_data_callback(
 
 static void handle_save_command() {
   if(!file) {
-    printf("[ERR] Failed to save the data!\n");
+    UI_ERROR("Failed to run the command!");
     return;
   }
 
@@ -103,7 +105,7 @@ static void handle_quit_command() {
 
 static void handle_compact_command() {
   if(!file) {
-    printf("[ERR] Failed to compact data!\n");
+    UI_ERROR("Failed to run the command!");
     return;
   }
 
@@ -114,12 +116,12 @@ static void handle_compact_command() {
 
 void parse(const struct statement* st) {
   if(!st) {
-    printf("Statement is null!\n");
+    UI_ERROR("Failed to parse the command!");
     return;
   }
 
   if(st->token_count == 0) {
-    printf("[ERR] Cannot parse empty statement!\n");
+    UI_ERROR("Cannot parse empty statement!");
     return;
   }
 
@@ -144,20 +146,20 @@ void parse(const struct statement* st) {
     handle_compact_command();
   }
   else {
-    printf("[ERR] Operation '%s' does not exist!\n", operation);
+    UI_ERROR("Operation '%s' does not exist!", operation);
   }
 }
 
 void load_data() {
   map = hash_map_init(16, 0.75);
   if(!map) {
-    printf("[ERR] Could not load the data. Failed to initialize the hash map\n");
+    UI_ERROR("Could not start application (System out of memory).");
     return;
   }
 
   file = fopen("data.txt", "a+");
   if(!file) {
-    printf("[ERR] Could not load the data. Failed to open the file\n");
+    UI_ERROR("Could not start application (Failed to load data).");
     return;
   }
   rewind(file); // Start reading from beginning
